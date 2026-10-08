@@ -35,22 +35,64 @@ st.title("📝 AI Meeting Assistant")
 st.write("Upload a meeting recording and get the transcript, minutes, decisions and action items.")
 
 # ------------------------------------------------------------------ API key (only asked when not configured)
-def _secret(name: str) -> str:
-    """Key from env/.env, else Streamlit Cloud secrets (so visitors never have to paste anything)."""
-    val = os.getenv(name, "")
-    if not val:
-        try:
-            val = str(st.secrets.get(name, "") or "")
-        except Exception:  # no secrets file / not configured
-            val = ""
-    return val.strip()
+KEY_NAMES = ("REFINER_API_KEY", "GROQ_API_KEY", "DOC_API_KEY", "API_KEY")
 
 
-api_key = _secret("REFINER_API_KEY") or _secret("GROQ_API_KEY")
-if not api_key:
+def _clean(val) -> str:
+    return str(val or "").strip().strip("'\"").strip()
+
+
+def _flatten(d, prefix=""):
+    """Yield (name, value) for every secret, including ones nested under a [section]."""
+    for k, v in d.items():
+        if hasattr(v, "items"):
+            yield from _flatten(v, f"{prefix}{k}.")
+        else:
+            yield f"{prefix}{k}", v
+
+
+def _configured_key() -> tuple[str, str, list[str]]:
+    """Return (key, where_found, secret_names_seen). Env/.env first, then Streamlit secrets."""
+    for name in KEY_NAMES:
+        val = _clean(os.getenv(name))
+        if val:
+            return val, f"environment variable {name}", []
+
+    names, error = [], ""
+    try:
+        items = list(_flatten(st.secrets))
+    except Exception as e:  # no secrets at all, or invalid TOML in the Secrets box
+        items, error = [], type(e).__name__  # name only: the message can echo the secret text
+    names = [n for n, _ in items]
+
+    wanted = {n.lower() for n in KEY_NAMES}
+    # exact name (top level or inside a section), case-insensitive
+    for full, val in items:
+        if full.split(".")[-1].lower() in wanted and _clean(val):
+            return _clean(val), f"secret {full}", names
+    # any other secret that looks like a Groq / API key
+    for full, val in items:
+        v, low = _clean(val), full.lower()
+        if v and (v.startswith("gsk_") or "groq" in low or ("api" in low and "key" in low)):
+            return v, f"secret {full}", names
+    return "", error, names
+
+
+api_key, key_source, secret_names = _configured_key()
+if api_key:
+    st.caption("🔑 Using the API key configured on the server.")
+else:
     st.warning(
         "No API key is configured on the server. Paste a free Groq key below "
         "(site owner: add REFINER_API_KEY in Streamlit → Settings → Secrets, then reboot the app)."
+    )
+    st.caption(
+        f"Debug: secrets visible to the app: {', '.join(secret_names) or 'none'}"
+        + (
+            f" · secrets could not be read ({key_source}). Check the Secrets box is valid TOML, "
+            'with quotes around the key: REFINER_API_KEY = "gsk_..."'
+            if key_source else ""
+        )
     )
     api_key = st.text_input(
         "Free Groq API key",
