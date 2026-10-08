@@ -1,0 +1,15 @@
+# Never commit these (this is what makes a repo 600+ MB)
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+models/
+*.bin
+*.onnx
+*.pt
+wheels/
+.cache/
+.DS_Store
