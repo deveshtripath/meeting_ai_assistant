@@ -35,8 +35,23 @@ st.title("📝 AI Meeting Assistant")
 st.write("Upload a meeting recording and get the transcript, minutes, decisions and action items.")
 
 # ------------------------------------------------------------------ API key (only asked when not configured)
-api_key = config.REFINER_API_KEY
+def _secret(name: str) -> str:
+    """Key from env/.env, else Streamlit Cloud secrets (so visitors never have to paste anything)."""
+    val = os.getenv(name, "")
+    if not val:
+        try:
+            val = str(st.secrets.get(name, "") or "")
+        except Exception:  # no secrets file / not configured
+            val = ""
+    return val.strip()
+
+
+api_key = _secret("REFINER_API_KEY") or _secret("GROQ_API_KEY")
 if not api_key:
+    st.warning(
+        "No API key is configured on the server. Paste a free Groq key below "
+        "(site owner: add REFINER_API_KEY in Streamlit → Settings → Secrets, then reboot the app)."
+    )
     api_key = st.text_input(
         "Free Groq API key",
         type="password",
@@ -54,7 +69,7 @@ with st.container(border=True):
         c1, c2 = st.columns(2)
         with open(SAMPLE_PATH, "rb") as f:
             c1.download_button("⬇ Download sample audio", f.read(), "test_meeting.mp3", "audio/mpeg", use_container_width=True)
-        if c2.button("▶ Run on the sample", type="primary", use_container_width=True, disabled=not api_key):
+        if c2.button("▶ Run on the sample", type="primary", use_container_width=True):
             job = (SAMPLE_PATH, "test_meeting.mp3", False)
         if os.path.exists(EXPECTED_PATH):
             with st.expander("What a correct result looks like"):
@@ -68,16 +83,22 @@ with st.container(border=True):
     uploaded = st.file_uploader(
         "Audio or video file (mp3, wav, m4a, mp4, …)", label_visibility="collapsed", type=None
     )
-    if st.button("▶ Process my file", type="primary", disabled=uploaded is None or not api_key):
+    if st.button("▶ Process my file", type="primary", disabled=uploaded is None):
         suffix = os.path.splitext(uploaded.name)[1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(uploaded.getbuffer())
         job = (tmp.name, uploaded.name, True)
 
-if not api_key:
-    st.caption("Enter a Groq API key above to enable processing.")
-
 # ------------------------------------------------------------------ run
+if job and not api_key:
+    st.error("Please enter a Groq API key first (or configure REFINER_API_KEY in the app's Secrets).")
+    if job[2]:
+        try:
+            os.unlink(job[0])
+        except OSError:
+            pass
+    job = None
+
 if job:
     path, name, is_temp = job
     st.session_state.pop("result", None)
