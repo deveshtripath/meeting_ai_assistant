@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SAMPLE_PATH = os.path.join(HERE, "test_audio", "test_meeting.mp3")
 EXPECTED_PATH = os.path.join(HERE, "test_audio", "expected_results.md")
 
-st.set_page_config(page_title="AI Meeting Assistant", page_icon="📝", layout="centered")
+st.set_page_config(page_title="AI Meeting Assistant", page_icon="", layout="centered")
 
 
 @st.cache_resource
@@ -31,7 +31,7 @@ def _warmup():
 
 _warmup()
 
-st.title("📝 AI Meeting Assistant")
+st.title("AI Meeting Assistant")
 st.write("Upload a meeting recording and get the transcript, minutes, decisions and action items.")
 
 # ------------------------------------------------------------------ API key (only asked when not configured)
@@ -80,12 +80,8 @@ def _configured_key() -> tuple[str, str, list[str]]:
 
 api_key, key_source, secret_names = _configured_key()
 if api_key:
-    st.caption("🔑 Using the API key configured on the server.")
+    st.caption("Using the API key configured on the server.")
 else:
-    st.warning(
-        "No API key is configured on the server. Paste a free Groq key below "
-        "(site owner: add REFINER_API_KEY in Streamlit → Settings → Secrets, then reboot the app)."
-    )
     st.caption(
         f"Debug: secrets visible to the app: {', '.join(secret_names) or 'none'}"
         + (

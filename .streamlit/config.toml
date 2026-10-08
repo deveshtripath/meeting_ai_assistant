@@ -8,3 +8,5 @@ gatherUsageStats = false
 [theme]
 base = "light"
 primaryColor = "#2563eb"
+backgroundColor = "#FFFDE7"
+secondaryBackgroundColor = "#FFF6C4"
